@@ -5,24 +5,31 @@
 #define NUM_LEDS 64
 
 // Data pin that led data will be written out over      
-#define DATA_PIN 3
+#define DATA_PIN   5
 
 // pins for reading the buttons
-#define LD_PIN    9
+#define RESET_PIN  8
+#define LD_PIN     9
 #define SS_PIN    10
 #define MOSI_PIN  11
 #define MISO_PIN  12
 #define SCLK_PIN  13
 
-#define DEBOUNCE  50
+#define DEBOUNCE  30
+
+#define ATTRACT_TIME 20000
 
 // This is an array of leds.  One item for each led in your strip.
 CRGB leds[NUM_LEDS];
-byte button[NUM_LEDS];
+byte debounce[NUM_LEDS];
+bool button[NUM_LEDS];
 byte gameboard[8][8];
+byte demoboard[8][8];
+
+unsigned long when;
  
 // define the order of the LEDs in the "strip"
-const int ledSequence[] {
+const byte ledSequence[] {
    0,  1,  2,  3,  16, 17, 18, 19,
    4,  5,  6,  7,  20, 21, 22, 23,
    8,  9, 10, 11,  24, 25, 26, 27,
@@ -35,7 +42,7 @@ const int ledSequence[] {
 
 // define the order of the buttons
 // note that some of the pins were wired out-of-order
-const int buttonSequence[] {
+const byte buttonSequence[] {
    15, 14, 13, 12,   7,  6,  5,  4,
    31, 30, 29, 28,  23, 22, 21, 20,
    11, 10,  9,  8,   2,  3,  1,  0,
@@ -51,45 +58,106 @@ const CRGB indexedColor[] {
   CRGB::Cyan,  CRGB::Magenta, CRGB::Yellow, CRGB::White,
 };
   
-void showBoard()
+void showBoard(byte board[8][8])
 {
-  for (int i = 0; i < NUM_LEDS; i++) {
-    int row = i / 8;
-    int col = i % 8;
-    leds[ledSequence[i]] = indexedColor[gameboard[row][col]];
+  for (byte i = 0; i < NUM_LEDS; i++) {
+    byte row = i / 8;
+    byte col = i % 8;
+    leds[ledSequence[i]] = indexedColor[board[row][col]];
   }
   FastLED.show();
 }
 
-void rect( int n, int m, int color )
+void rect( byte n, byte m, byte color )
 {
   if (n < 0 || n >= 8 || m < 0 || m >= 8) return;
-  gameboard[n][m] = color;
-  gameboard[7-n][m] = color;
-  gameboard[n][7-m] = color;
-  gameboard[7-n][7-m] = color;
+  demoboard[n][m] = color;
+  demoboard[7-n][m] = color;
+  demoboard[n][7-m] = color;
+  demoboard[7-n][7-m] = color;
 }
 
-void zoomIn()
+void shrink()
 {
-  for (int n = 0; n < 4; n++) {
-    rect(n, n, 7);
-    showBoard();
-    delay(100);
-    rect(n, n, 0);
-  }
+  demoboard[3][3] = demoboard[2][2];
+  demoboard[3][4] = demoboard[2][5];
+  demoboard[4][4] = demoboard[5][5];
+  demoboard[4][3] = demoboard[5][2];
+
+  demoboard[2][2] = demoboard[1][1];
+  demoboard[2][3] = demoboard[1][3];
+  demoboard[2][4] = demoboard[1][4];
+  demoboard[2][5] = demoboard[1][6];
+  demoboard[3][5] = demoboard[3][6];
+  demoboard[4][5] = demoboard[4][6];
+  demoboard[5][5] = demoboard[6][6];
+  demoboard[5][4] = demoboard[6][4];
+  demoboard[5][3] = demoboard[6][3];
+  demoboard[5][2] = demoboard[6][1];
+  demoboard[4][2] = demoboard[4][1];
+  demoboard[3][2] = demoboard[3][1];
+
+  demoboard[1][1] = demoboard[0][0];
+  demoboard[1][2] = demoboard[0][1];
+  demoboard[1][3] = demoboard[0][3];
+  demoboard[1][4] = demoboard[0][4];
+  demoboard[1][5] = demoboard[0][6];
+  demoboard[1][6] = demoboard[0][7];
+  demoboard[2][6] = demoboard[1][7];
+  demoboard[3][6] = demoboard[3][7];
+  demoboard[4][6] = demoboard[4][7];
+  demoboard[5][6] = demoboard[6][7];
+  demoboard[6][6] = demoboard[7][7];
+  demoboard[6][5] = demoboard[7][6];
+  demoboard[6][4] = demoboard[7][4];
+  demoboard[6][3] = demoboard[7][3];
+  demoboard[6][2] = demoboard[7][1];
+  demoboard[6][1] = demoboard[7][0];
+  demoboard[5][1] = demoboard[6][0];
+  demoboard[4][1] = demoboard[4][0];
+  demoboard[3][1] = demoboard[3][0];
+  demoboard[2][1] = demoboard[1][0];
+
+  demoboard[0][0] = 7;
+  demoboard[0][1] = 0;
+  demoboard[0][2] = 0;
+  demoboard[0][3] = 0;
+  demoboard[0][4] = 0;
+  demoboard[0][5] = 0;
+  demoboard[0][6] = 0;
+  demoboard[0][7] = 7;
+  demoboard[1][7] = 0;
+  demoboard[2][7] = 0;
+  demoboard[3][7] = 0;
+  demoboard[4][7] = 0;
+  demoboard[5][7] = 0;
+  demoboard[6][7] = 0;
+  demoboard[7][7] = 7;
+  demoboard[7][6] = 0;
+  demoboard[7][5] = 0;
+  demoboard[7][4] = 0;
+  demoboard[7][3] = 0;
+  demoboard[7][2] = 0;
+  demoboard[7][1] = 0;
+  demoboard[7][0] = 7;
+  demoboard[6][0] = 0;
+  demoboard[5][0] = 0;
+  demoboard[4][0] = 0;
+  demoboard[3][0] = 0;
+  demoboard[2][0] = 0;
+  demoboard[1][0] = 0;
 }
 
 void bigBang()
 {
   rect(3, 3, 1);
-  showBoard();
+  showBoard(demoboard);
   delay(40);
   
   rect(2, 2, 1);
   rect(2, 3, 3);
   rect(3, 2, 2);
-  showBoard();
+  showBoard(demoboard);
   delay(40);
 
   rect(1, 1, 1);
@@ -97,7 +165,7 @@ void bigBang()
   rect(3, 1, 2);
   rect(1, 2, 5);
   rect(2, 1, 6);
-  showBoard();
+  showBoard(demoboard);
   delay(40);
 
   rect(0, 0, 1);
@@ -107,17 +175,17 @@ void bigBang()
   rect(2, 0, 7);
   rect(0, 1, 4);
   rect(1, 0, 4);
-  showBoard();
+  showBoard(demoboard);
   delay(40);
 
   rect(3, 3, 0);
-  showBoard();
+  showBoard(demoboard);
   delay(40);
 
   rect(2, 2, 0);
   rect(2, 3, 0);
   rect(3, 2, 0);
-  showBoard();
+  showBoard(demoboard);
   delay(40);
 
   rect(1, 1, 0);
@@ -125,7 +193,7 @@ void bigBang()
   rect(3, 1, 0);
   rect(1, 2, 0);
   rect(2, 1, 0);
-  showBoard();
+  showBoard(demoboard);
   delay(40);
 
   rect(0, 0, 0);
@@ -135,31 +203,87 @@ void bigBang()
   rect(2, 0, 0);
   rect(0, 1, 0);
   rect(1, 0, 0);
-  showBoard();
+}
+
+
+void attract()
+{
+  memcpy(demoboard, gameboard, sizeof demoboard);
+  
+  shrink();
+  showBoard(demoboard);
+  delay(100);
+
+  shrink();
+  showBoard(demoboard);
+  delay(100);
+
+  shrink();
+  showBoard(demoboard);
+  delay(100);
+
+  shrink();
+  rect(0, 0, 0);
+  showBoard(demoboard);
+  delay(100);
+
+  shrink();
+  rect(0, 0, 0);
+  showBoard(demoboard);
+  delay(100);
+
+  shrink();
+  rect(0, 0, 0);
+  showBoard(demoboard);
+  delay(100);
+
+  shrink();
+  rect(0, 0, 0);
+  showBoard(demoboard);
+  delay(300);
+
+  bigBang();
+  showBoard(demoboard);
+  delay(40);
+
+  bigBang();
+  showBoard(demoboard);
+  delay(40);
+
+  bigBang();
+  showBoard(demoboard);
   delay(40);
 }
 
 void setup()
 {
+  delay(2000);
+  
   FastLED.addLeds<WS2811, DATA_PIN, RGB>(leds, NUM_LEDS);
   FastLED.setBrightness(50);
   
+  pinMode(RESET_PIN, OUTPUT);
   pinMode(LD_PIN, OUTPUT);
   pinMode(SS_PIN, OUTPUT);
   pinMode(MOSI_PIN, OUTPUT);
   pinMode(MISO_PIN, INPUT);
   pinMode(SCLK_PIN, OUTPUT);
 
+  digitalWrite(RESET_PIN, LOW);
   digitalWrite(LD_PIN, HIGH);
   digitalWrite(SS_PIN, LOW);
   digitalWrite(MOSI_PIN, HIGH);
   digitalWrite(SCLK_PIN, LOW);
+  delayMicroseconds(100);
+  digitalWrite(RESET_PIN, HIGH);
 
-  zoomIn();
-  delay(200);
-  bigBang();
-  bigBang();
-  bigBang();
+  memset(demoboard, 0, sizeof demoboard);
+  memset(gameboard, 0, sizeof gameboard);
+  memset(debounce, 0, sizeof debounce);
+  memset(button, 0, sizeof button);
+
+  attract();
+  when = millis();
 }
 
 void readButtons()
@@ -169,12 +293,17 @@ void readButtons()
   delayMicroseconds(10);
   digitalWrite(SCLK_PIN, LOW);
   digitalWrite(LD_PIN, HIGH);
-  for (int i = 0; i < NUM_LEDS; i++) {
-    if (digitalRead(MISO_PIN)) {
-      button[buttonSequence[i]] = 0;
+  for (byte i = 0; i < NUM_LEDS; i++) {
+    byte j = buttonSequence[i];
+    if (!digitalRead(MISO_PIN)) {
+      if (debounce[j] == 0) {
+        button[j] = true;
+      }
+      debounce[j] = DEBOUNCE;
     } else {
-      if (button[buttonSequence[i]] < 255)
-        ++button[buttonSequence[i]];
+      if (debounce[j] > 0) {
+        --debounce[j];
+      }
     }
     digitalWrite(SCLK_PIN, HIGH);
     delayMicroseconds(10);
@@ -186,20 +315,28 @@ void readButtons()
 void loop()
 {
   readButtons();
-  for (int i = 0; i < NUM_LEDS; i++) {
-    if (button[i] == DEBOUNCE) {
-      int row = i / 8;
-      int col = i % 8;
-      gameboard[row][col] = (gameboard[row][col] + 1) % 8;
-      for (int j = 0; j < row; j++)
-        gameboard[j][col] = (gameboard[j][col] + 1) % 8;
-      for (int j = row+1; j < 8; j++)
-        gameboard[j][col] = (gameboard[j][col] + 1) % 8;
-      for (int j = 0; j < col; j++)
-        gameboard[row][j] = (gameboard[row][j] + 1) % 8;
-      for (int j = col+1; j < 8; j++)
-        gameboard[row][j] = (gameboard[row][j] + 1) % 8;
+  unsigned long now = millis();
+  if ((unsigned long)(now - when) > ATTRACT_TIME) {
+    attract();
+    when = millis();
+  } else {
+    for (byte i = 0; i < NUM_LEDS; i++) {
+      if (button[i]) {
+        byte row = i / 8;
+        byte col = i % 8;
+        gameboard[row][col] = (gameboard[row][col] + 1) % 8;
+        for (byte j = 0; j < row; j++)
+          gameboard[j][col] = (gameboard[j][col] + 1) % 8;
+        for (byte j = row+1; j < 8; j++)
+          gameboard[j][col] = (gameboard[j][col] + 1) % 8;
+        for (byte j = 0; j < col; j++)
+          gameboard[row][j] = (gameboard[row][j] + 1) % 8;
+        for (byte j = col+1; j < 8; j++)
+          gameboard[row][j] = (gameboard[row][j] + 1) % 8;
+        when = now;
+        button[i] = false;
+      }
     }
   }
-  showBoard();
+  showBoard(gameboard);
 }
