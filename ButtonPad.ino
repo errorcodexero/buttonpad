@@ -262,30 +262,25 @@ void attract()
 
 void solve()
 {
-  bool solved = false;
   increment = 1;
-  do {
-    solved = true;
-    for (byte i = 0; i < NUM_LEDS; i++) {
-      if (pressed[i] != 0) {
-        solved = false;
-        byte row = i / 8;
-        byte col = i % 8;
-        gameboard[row][col] = (gameboard[row][col] + increment) % 8;
-        for (byte j = 0; j < row; j++)
-          gameboard[j][col] = (gameboard[j][col] + increment) % 8;
-        for (byte j = row + 1; j < 8; j++)
-          gameboard[j][col] = (gameboard[j][col] + increment) % 8;
-        for (byte j = 0; j < col; j++)
-          gameboard[row][j] = (gameboard[row][j] + increment) % 8;
-        for (byte j = col + 1; j < 8; j++)
-          gameboard[row][j] = (gameboard[row][j] + increment) % 8;
-        pressed[i] = (pressed[i] + increment) % 8;
-        showBoard(gameboard);
-        delay(300);
-      }
+  for (byte i = 0; i < NUM_LEDS; i++) {
+    byte row = i / 8;
+    byte col = i % 8;
+    while (pressed[i] != 0) {
+      gameboard[row][col] = (gameboard[row][col] + increment) % 8;
+      for (byte j = 0; j < row; j++)
+        gameboard[j][col] = (gameboard[j][col] + increment) % 8;
+      for (byte j = row + 1; j < 8; j++)
+        gameboard[j][col] = (gameboard[j][col] + increment) % 8;
+      for (byte j = 0; j < col; j++)
+        gameboard[row][j] = (gameboard[row][j] + increment) % 8;
+      for (byte j = col + 1; j < 8; j++)
+        gameboard[row][j] = (gameboard[row][j] + increment) % 8;
+      pressed[i] = (pressed[i] + increment) % 8;
+      showBoard(gameboard);
+      delay(300);
     }
-  } while (!solved);
+  }
 }
 
 void setup()
